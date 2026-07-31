@@ -161,9 +161,26 @@ function copySigAsImage(){
     holder.style.padding="10px";
     holder.innerHTML=sig(D[cur],g("fn"),g("ft"),g("fp"),g("fe"));
     document.body.appendChild(holder);
-    html2canvas(holder,{scale:3,backgroundColor:"#ffffff"}).then(function(canvas){
+    html2canvas(holder,{scale:6,backgroundColor:"#ffffff"}).then(function(hiResCanvas){
       document.body.removeChild(holder);
-      canvas.toBlob(function(blob){
+      // hiResCanvas was captured at 3x for crisp antialiased edges, but Outlook/Gmail
+      // insert pasted images at their native pixel size (no retina/DPI scaling applied),
+      // so handing over the 3x canvas directly makes the signature 3x too big in the
+      // email. Downscale to the actual CSS size of the signature (1x) so it displays
+      // at the same size it appears in the preview above, while keeping the sharper
+      // 3x-supersampled detail baked in.
+      var outCanvas=document.createElement("canvas");
+      // Output at 85% of the on-screen preview size — captured/downsampled
+      // from the 6x hi-res render (a ~7x reduction ratio) for extra-sharp,
+      // high-quality edges with zero blur or graininess.
+      var OUTPUT_SCALE=0.85;
+      outCanvas.width=Math.round(hiResCanvas.width/6*OUTPUT_SCALE);
+      outCanvas.height=Math.round(hiResCanvas.height/6*OUTPUT_SCALE);
+      var ctx=outCanvas.getContext("2d");
+      ctx.imageSmoothingEnabled=true;
+      ctx.imageSmoothingQuality="high";
+      ctx.drawImage(hiResCanvas,0,0,outCanvas.width,outCanvas.height);
+      outCanvas.toBlob(function(blob){
         if(blob){resolve(blob);}else{reject(new Error("toBlob returned null"));}
       },"image/png");
     }).catch(function(err){
